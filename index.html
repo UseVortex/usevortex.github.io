@@ -1,0 +1,71 @@
+<script>
+const acceptedLocales = [
+  'en-au','en-ca','en-gb','en-in','en-us',
+  'de-de','es-es','es-la','fr-fr','it-it',
+  'ja-jp','ko-kr','pl-pl','pt-br','ru-ru',
+  'zh-tw','zh-cn','zh-hans-cn'
+];
+
+const orphanLocales = ['sv-se','nl-nl','vi-vn','th-th','id-id','tr-tr'];
+
+const ignoreList = ['apps','docs','rate-limit-test','rss'];
+
+function getPathFromLocale(currentLocale, targetLocale, remainingPath) {
+  if (
+    currentLocale === targetLocale ||
+    !acceptedLocales.includes(targetLocale) ||
+    acceptedLocales.includes(currentLocale) ||
+    orphanLocales.includes(currentLocale)
+  ) {
+    return null;
+  }
+  return [targetLocale, currentLocale ? currentLocale : '', remainingPath]
+    .filter(p => p !== '')
+    .join('/');
+}
+
+function redirectByLocale() {
+  const host = window.location.host.toLowerCase();
+  if (
+    host === 'staging.cloudflare-cn.com' ||
+    host === 'cloudflare-cn.com' ||
+    host === 'www.cloudflare-cn.com'
+  ) return;
+
+  const storedLang = localStorage.getItem('langPreference');
+  const splitPath = window.location.pathname.split('/').filter(p => p !== '');
+  const currentPathSegment = splitPath[0] || '';
+
+  // Case 1: localStorage preference exists
+  if (storedLang && storedLang.toLowerCase() !== 'en-us') {
+    if (
+      !acceptedLocales.includes(currentPathSegment) &&
+      !orphanLocales.includes(currentPathSegment) &&
+      !ignoreList.includes(currentPathSegment)
+    ) {
+      splitPath.unshift(storedLang.toLowerCase());
+      const newUrl = `https://${window.location.hostname}/${splitPath.join('/')}${window.location.search}`;
+      window.location.replace(newUrl);
+    }
+  }
+  // Case 2: no preference, use browser language
+  else if (!navigator.userAgent.toLowerCase().includes('googlebot')) {
+    const browserLang = navigator.language || '';
+    if (browserLang.toLowerCase() !== 'en-us') {
+      const langCode = browserLang
+        .toLowerCase()
+        .replace('_', '-')
+        .replace('hans-', ''); // zh-hans-cn → zh-cn
+      const maybeLocale = splitPath.shift();
+      const remainingPath = splitPath.join('/');
+      const redirectPath = getPathFromLocale(maybeLocale, langCode, remainingPath);
+      if (redirectPath && !ignoreList.includes(maybeLocale)) {
+        const newUrl = `https://${window.location.hostname}/${redirectPath}${window.location.search}`;
+        window.location.replace(newUrl);
+      }
+    }
+  }
+}
+
+redirectByLocale();
+</script>
